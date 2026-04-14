@@ -13,18 +13,17 @@ class TextDelta:
         return self.content
 
 
-@dataclass
-class EventType(str,Enum):
-    TEXT_DELTA="text_delta",
-    MESSAGE_COMPLETION="message_completion",
-    ERROR="error",
+class StreamEventType(str,Enum):
+    TEXT_DELTA="text_delta"
+    MESSAGE_COMPLETION="message_completion"
+    ERROR="error"
     
 @dataclass
 class TokenUsage:
-    prompt_token: int =0,
-    completion_token: int =0,
-    total_token: int =0,
-    cached_token: int =0,
+    prompt_token: int =0
+    completion_token: int =0
+    total_token: int =0
+    cached_token: int =0
 
     def __add__(self,other:TokenUsage):
         return TokenUsage(
@@ -38,7 +37,7 @@ class TokenUsage:
 
 @dataclass
 class StreamEvent:
-    type:EventType
+    type:StreamEventType
     text_delta:TextDelta | None = None
     error:str | None = None
     finish_reason:str | None = None
