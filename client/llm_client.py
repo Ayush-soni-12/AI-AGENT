@@ -1,7 +1,7 @@
 from openai import AsyncOpenAI,RateLimitError,APIConnectionError,APIError
 from typing import Any ,AsyncGenerator
 from dotenv import load_dotenv
-from client.response import TextDelta,TokenUsage,StreamEvent,EventType
+from client.response import TextDelta,TokenUsage,StreamEvent,StreamEventType
 import os
 import asyncio
 
@@ -16,7 +16,7 @@ class LLMClient:
     def get_client(self) -> AsyncOpenAI:
         if self._client is None:
             self._client = AsyncOpenAI(
-                base_url="https://openrouter.ai/api/v1",
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
                 api_key=os.getenv("API_KEY"),
             )
         return self._client
@@ -30,7 +30,7 @@ class LLMClient:
         client = self.get_client()
 
         kwargs = {
-            "model":"nvidia/nemotron-3-super-120b-a12b:free",
+            "model":"gemini-2.5-flash",
             "messages":messages,
             "stream":stream,
             }
@@ -50,8 +50,8 @@ class LLMClient:
                     await asyncio.sleep(wait_time)
                 else:
                     yield StreamEvent(
-                        type=EventType.ERROR,
-                        error=f"Rate limit exceeded after {self._max_retries} attempts",
+                        type=StreamEventType.ERROR,
+                        error=f"Rate limit exceeded after {self._max_retries} retries: {e.status_code} - {e.message}",
                     )
                     return
             except APIConnectionError as e:
@@ -60,8 +60,8 @@ class LLMClient:
                     await asyncio.sleep(wait_time)
                 else:
                     yield StreamEvent(
-                        type=EventType.ERROR,
-                        error=f"API Connection Error after {self._max_retries} attempts",
+                        type=StreamEventType.ERROR,
+                        error=f"API Connection Error after {self._max_retries} retries: {str(e)}",
                     )
                     return
             except APIError as e:
@@ -70,10 +70,16 @@ class LLMClient:
                     await asyncio.sleep(wait_time)
                 else:
                     yield StreamEvent(
-                        type=EventType.ERROR,
-                        error=f"API Error after {self._max_retries} attempts",
+                        type=StreamEventType.ERROR,
+                        error=f"API Error after {self._max_retries} retries: {e.status_code} - {e.message}",
                     )
                     return
+            except Exception as e:
+                yield StreamEvent(
+                    type=StreamEventType.ERROR,
+                    error=f"Unexpected error: {type(e).__name__}: {str(e)}",
+                )
+                return
             
   
     
@@ -108,12 +114,12 @@ class LLMClient:
             
             if getattr(delta, "content", None):
                 yield StreamEvent(
-                    type=EventType.TEXT_DELTA,
+                    type=StreamEventType.TEXT_DELTA,
                     text_delta=TextDelta(content=delta.content),
                 )
         
         yield StreamEvent(
-            type=EventType.MESSAGE_COMPLETION,
+            type=StreamEventType.MESSAGE_COMPLETION,
             finish_reason=finish_reason,
             usage=usage,
         )
@@ -138,7 +144,7 @@ class LLMClient:
             )
 
         return StreamEvent(
-            type=EventType.MESSAGE_COMPLETION,
+            type=StreamEventType.MESSAGE_COMPLETION,
             text_delta=text_delta,
             finish_reason=choice.finish_reason,
             usage=usage,
