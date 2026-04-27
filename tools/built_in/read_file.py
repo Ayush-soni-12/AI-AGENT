@@ -7,8 +7,8 @@ from utils.text import truncate_text, count_tokens
 class ReadFileParams(BaseModel):
 
     path: str = Field(...,description="Path to the file to read(relative to working directory or absolute)")
-    offset:int = Field(1,ge=1,description="Offset to start reading from")
-    limit:int = Field(None,ge=1,description="Maximum number of lines to read . If not specified read the entire file")
+    offset:int = Field(default=1,ge=1,description="Offset to start reading from")
+    limit:int | None = Field(default=None,ge=1,description="Maximum number of lines to read . If not specified read the entire file")
 
 
 class ReadFileTool(Tool):
@@ -82,12 +82,14 @@ class ReadFileTool(Tool):
                 formatted_lines.append(f"{i:6}|{line}")
 
             output = "\n".join(formatted_lines)
-            token_count = count_tokens(output)
+            # The count_tokens function in utils/text.py requires the model name as the first argument!
+            token_count = count_tokens("gemini-2.5-flash", output)
 
             truncated = False
             if token_count > self.MAX_OUTPUT_TOKENS:
                 output = truncate_text(
                     output,
+                    "gemini-2.5-flash",
                     self.MAX_OUTPUT_TOKENS,
                     suffix=f"\n... [truncated {total_lines} total lines]",
                 )

@@ -12,6 +12,10 @@ class AgentEventType(str,Enum):
 
     TEXT_DELTA = "text_delta"
     TEXT_COMPLETE = "text_complete"
+    
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
+    TOOL_CONFIRMATION = "tool_confirmation"
 
 
 
@@ -55,4 +59,24 @@ class AgentEvent:
             type=AgentEventType.TEXT_COMPLETE,
             data={"content":content},
         )
-            
+
+    @classmethod
+    def tool_call(cls,name:str, arguments:dict) -> AgentEvent:
+        return cls(
+            type=AgentEventType.TOOL_CALL,
+            data={"name":name, "arguments":arguments},
+        )
+
+    @classmethod
+    def tool_result(cls,name:str, result:str) -> AgentEvent:
+        return cls(
+            type=AgentEventType.TOOL_RESULT,
+            data={"name":name, "result":result},
+        )
+
+    @classmethod
+    def tool_confirmation(cls, confirmation: Any) -> AgentEvent:
+        return cls(
+            type=AgentEventType.TOOL_CONFIRMATION,
+            data={"confirmation": confirmation},
+        )

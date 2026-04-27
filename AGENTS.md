@@ -1,0 +1,1 @@
+All API endpoints must have docstrings

@@ -17,6 +17,7 @@ class StreamEventType(str,Enum):
     TEXT_DELTA="text_delta"
     MESSAGE_COMPLETION="message_completion"
     ERROR="error"
+    TOOL_CALL="tool_call"
     
 @dataclass
 class TokenUsage:
@@ -42,5 +43,4 @@ class StreamEvent:
     error:str | None = None
     finish_reason:str | None = None
     usage: TokenUsage | None = None
-
-    
+    tool_calls: list[dict] | None = None

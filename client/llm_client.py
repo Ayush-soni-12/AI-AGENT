@@ -15,9 +15,10 @@ class LLMClient:
 
     def get_client(self) -> AsyncOpenAI:
         if self._client is None:
+            from config.config import config_mgr
             self._client = AsyncOpenAI(
-                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-                api_key=os.getenv("API_KEY"),
+                base_url=config_mgr.get("base_url", "https://generativelanguage.googleapis.com/v1beta/openai/"),
+                api_key=config_mgr.get("api_key", os.getenv("API_KEY")),
             )
         return self._client
 
@@ -26,14 +27,40 @@ class LLMClient:
             await self._client.close()
             self._client = None
 
-    async def chat_completion(self,messages:list[dict[str,Any]],stream:bool = True)->AsyncGenerator[StreamEvent,None]:
-        client = self.get_client()
 
+    
+    def _build_tools(self, tools: list[dict[str, Any]]):
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool.get("description", ""),
+                    "parameters": tool.get(
+                        "parameters",
+                        {
+                            "type": "object",
+                            "properties": {},
+                        },
+                    ),
+                },
+            }
+            for tool in tools
+        ]
+
+
+    async def chat_completion(self,messages:list[dict[str,Any]],tools:list[dict[str,Any]] | None = None,stream:bool = True)->AsyncGenerator[StreamEvent,None]:
+        client = self.get_client()
+        from config.config import config_mgr
+        
         kwargs = {
-            "model":"gemini-2.5-flash",
+            "model": config_mgr.get("model", "gemini-2.5-flash"),
             "messages":messages,
             "stream":stream,
             }
+        if tools:
+            kwargs["tools"] = self._build_tools(tools)
+            kwargs["tool_choice"] = "auto"
     
         for attempt in range(self._max_retries+1):
             try:
@@ -41,9 +68,9 @@ class LLMClient:
                    async for event in self._stream_response(client ,kwargs):
                        yield event
                 else:
-                  event =  await self._non_stream_response(client,kwargs)
-                  yield event
-                return
+                   async for event in self._non_stream_response(client,kwargs):
+                       yield event
+                return  
             except RateLimitError as e:
                 if attempt < self._max_retries:
                     wait_time = 2**attempt
@@ -88,6 +115,7 @@ class LLMClient:
 
         finish_reason : str | None = None
         usage :TokenUsage | None = None
+        tool_calls : list[dict] = []
 
         async for chunk in response:
             if hasattr(chunk,"usage") and chunk.usage:
@@ -112,40 +140,81 @@ class LLMClient:
             if getattr(choice, "finish_reason", None):
                 finish_reason=choice.finish_reason
             
+            # Catch tool_calls chunks and stitch the JSON strings together
+            if getattr(delta, "tool_calls", None):
+                for tc in delta.tool_calls:
+                    idx = tc.index if tc.index is not None else 0
+                    while len(tool_calls) <= idx:
+                        tool_calls.append({"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
+                    if getattr(tc, "id", None):
+                        tool_calls[idx]["id"] = tc.id
+                    if getattr(tc, "function", None):
+                        if getattr(tc.function, "name", None):
+                            tool_calls[idx]["function"]["name"] = tc.function.name
+                        if getattr(tc.function, "arguments", None):
+                            tool_calls[idx]["function"]["arguments"] += tc.function.arguments
+
             if getattr(delta, "content", None):
                 yield StreamEvent(
                     type=StreamEventType.TEXT_DELTA,
                     text_delta=TextDelta(content=delta.content),
                 )
         
+        # If the AI asked for any tools, yield them now before completion
+        if tool_calls:
+            yield StreamEvent(
+                type=StreamEventType.TOOL_CALL,
+                tool_calls=tool_calls
+            )
+
         yield StreamEvent(
             type=StreamEventType.MESSAGE_COMPLETION,
             finish_reason=finish_reason,
             usage=usage,
         )
         
-    async def _non_stream_response(self,client:AsyncOpenAI,kwargs:dict[str,Any])->StreamEvent:
+    async def _non_stream_response(self,client:AsyncOpenAI,kwargs:dict[str,Any])->AsyncGenerator[StreamEvent,None]:
         response  = await client.chat.completions.create(**kwargs)
-        # print(response)
         choice  = response.choices[0]
         message = choice.message
         
-        text_delta = None
-        if message.content:
-            text_delta = TextDelta(content=message.content)
-            print(text_delta)
-
-        if response.usage:
+        usage = None
+        if hasattr(response,"usage") and response.usage:
+            cached = 0
+            if hasattr(response.usage, "prompt_tokens_details") and response.usage.prompt_tokens_details:
+                 cached = response.usage.prompt_tokens_details.cached_tokens
             usage = TokenUsage(
                 prompt_token = response.usage.prompt_tokens,
                 completion_token = response.usage.completion_tokens,
                 total_token = response.usage.total_tokens,
-                cached_token=response.usage.prompt_tokens_details.cached_tokens,
+                cached_token=cached,
             )
 
-        return StreamEvent(
+        if getattr(message, "tool_calls", None):
+            tool_calls = []
+            for tc in message.tool_calls:
+                tool_calls.append({
+                    "id": getattr(tc, "id", ""),
+                    "type": getattr(tc, "type", "function"),
+                    "function": {
+                        "name": tc.function.name if getattr(tc, "function", None) else "",
+                        "arguments": tc.function.arguments if getattr(tc, "function", None) else ""
+                    }
+                })
+            
+            yield StreamEvent(
+                type=StreamEventType.TOOL_CALL,
+                tool_calls=tool_calls
+            )
+
+        if message.content:
+            yield StreamEvent(
+                type=StreamEventType.TEXT_DELTA,
+                text_delta=TextDelta(content=message.content)
+            )
+
+        yield StreamEvent(
             type=StreamEventType.MESSAGE_COMPLETION,
-            text_delta=text_delta,
             finish_reason=choice.finish_reason,
             usage=usage,
         )

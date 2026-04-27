@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neuralclaude"
+version = "0.1.0"
+description = "Terminal AI Coding Agent"
+authors = [
+    {name = "Ayush"}
+]
+dependencies = [
+    "click",
+    "rich",
+    "pydantic",
+    "prompt_toolkit",
+    "textual",
+    "openai",
+    "python-dotenv",
+    "ddgs",
+    "requests",
+    "beautifulsoup4",
+    "mcp"
+]
+
+[project.scripts]
+neuralclaude = "main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ui*", "agent*", "prompt*", "config*", "client*", "context*", "tools*", "utils*"]
+
+[tool.setuptools]
+py-modules = ["main"]
+

@@ -1,0 +1,6 @@
+.env
+.venv
+__pycache__
+.agent_sessions/
+.agent_memory.db
+*.egg-info/

@@ -7,13 +7,14 @@ from typing import Any
 from dataclasses import dataclass, field
 from pydantic.json_schema import model_json_schema
 
-from config.config import Config
+from config.config import ConfigManager
 
 
 class ToolKind(str, Enum):
     READ = "read"
     WRITE = "write"
     SHELL = "shell"
+    WEB = "web"
     NETWORK = "network"
     MEMORY = "memory"
     MCP = "mcp"

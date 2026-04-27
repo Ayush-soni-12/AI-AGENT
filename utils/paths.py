@@ -13,6 +13,6 @@ def is_binary_file(path :str| Path) -> bool:
     try:
         with open(path, "rb") as f:
            chunk =  f.read(8192)
-           return f"\x00" in chunk
+           return b"\x00" in chunk
     except Exception:
         return False
