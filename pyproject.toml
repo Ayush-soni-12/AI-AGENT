@@ -20,7 +20,8 @@ dependencies = [
     "ddgs",
     "requests",
     "beautifulsoup4",
-    "mcp"
+    "mcp",
+    "tiktoken"
 ]
 
 [project.scripts]
