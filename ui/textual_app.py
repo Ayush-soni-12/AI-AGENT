@@ -1,10 +1,119 @@
 import json
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Markdown, Static, Label, Button
-from textual.containers import VerticalScroll, Grid
+from textual.widgets import Header, Footer, Input, Markdown, Static, Label, Button, TextArea
+from textual.containers import VerticalScroll, Grid, Vertical
 from textual.screen import ModalScreen
 from textual import work
 from agent.event import AgentEventType
+
+
+class GitCommitScreen(ModalScreen[str | None]):
+    """Modal that shows an AI-generated commit message for review and editing."""
+
+    CSS = """
+    GitCommitScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.8);
+    }
+    #git-dialog {
+        padding: 1 2;
+        width: 90;
+        height: auto;
+        max-height: 40;
+        border: thick green;
+        background: $surface;
+        layout: vertical;
+    }
+    #git-title {
+        text-style: bold;
+        color: green;
+        margin-bottom: 1;
+    }
+    #commit-msg {
+        height: 12;
+        margin-bottom: 1;
+        border: solid $accent;
+    }
+    #git-btn-row {
+        grid-size: 3;
+        grid-gutter: 1 2;
+        height: 3;
+    }
+    #git-btn-row Button { width: 100%; }
+    """
+
+    def __init__(self, message: str):
+        super().__init__()
+        self._initial_message = message
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="git-dialog"):
+            yield Label("🤖 AI-Generated Commit Message (edit if needed):", id="git-title")
+            yield TextArea(self._initial_message, id="commit-msg")
+            with Grid(id="git-btn-row"):
+                yield Button("✅ Commit", variant="success", id="do-commit")
+                yield Button("✏️ Clear", variant="default", id="clear-msg")
+                yield Button("❌ Cancel", variant="error", id="cancel-commit")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "do-commit":
+            msg = self.query_one("#commit-msg", TextArea).text.strip()
+            self.dismiss(msg if msg else None)
+        elif event.button.id == "clear-msg":
+            self.query_one("#commit-msg", TextArea).clear()
+        else:
+            self.dismiss(None)
+
+
+class GitPRScreen(ModalScreen[bool]):
+    """Modal that previews an AI-generated PR title + body before creating."""
+
+    CSS = """
+    GitPRScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.8);
+    }
+    #pr-dialog {
+        padding: 1 2;
+        width: 90;
+        height: auto;
+        max-height: 45;
+        border: thick cyan;
+        background: $surface;
+        layout: vertical;
+    }
+    #pr-title-label { text-style: bold; color: cyan; }
+    #pr-title-input { margin-bottom: 1; border: solid $accent; }
+    #pr-body-area { height: 15; margin-bottom: 1; border: solid $accent; }
+    #pr-btn-row { grid-size: 2; grid-gutter: 1 2; height: 3; }
+    #pr-btn-row Button { width: 100%; }
+    """
+
+    def __init__(self, title: str, body: str):
+        super().__init__()
+        self._title = title
+        self._body = body
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="pr-dialog"):
+            yield Label("🐙 AI-Generated Pull Request (edit if needed):", id="pr-title-label")
+            yield Input(self._title, id="pr-title-input", placeholder="PR Title")
+            yield TextArea(self._body, id="pr-body-area")
+            with Grid(id="pr-btn-row"):
+                yield Button("🚀 Create PR", variant="success", id="do-pr")
+                yield Button("❌ Cancel", variant="error", id="cancel-pr")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "do-pr")
+
+    def get_title(self) -> str:
+        """Return the (possibly edited) PR title."""
+        return self.query_one("#pr-title-input", Input).value.strip()
+
+    def get_body(self) -> str:
+        """Return the (possibly edited) PR body."""
+        return self.query_one("#pr-body-area", TextArea).text.strip()
+
 
 class ConfirmScreen(ModalScreen[bool]):
     CSS = """
@@ -199,7 +308,7 @@ class ChatApp(App):
         yield Header(show_clock=True)
         yield VerticalScroll(id="chat-container")
         
-        commands = ["/help", "/mcp", "/config", "/new", "/past", "/clear", "/clear memory", "exit", "quit"]
+        commands = ["/help", "/mcp", "/commit", "/pr", "/config", "/new", "/past", "/clear", "/clear memory", "exit", "quit"]
         yield Input(
             placeholder="Ask Neural Claude... (Type '/' for commands)", 
             id="prompt",
@@ -334,7 +443,9 @@ class ChatApp(App):
 | `/past` | List all saved session threads for this project |
 | `/past [N]` | Resume session thread number N |
 | `/clear` | Clear the screen only — session keeps going, nothing saved to /past |
-| `/clear memory` | Clear the screen AND wipe the project memory database |
+| `/clear memory` | Clear the screen AND wipe ALL project data (memory + sessions) |
+| `/commit` | AI writes a commit message for your changes, opens preview |
+| `/pr` | AI writes a PR title + description, opens preview to create PR |
 | `/mcp` | Show connected MCP servers and their available tools |
 | `/config` | Open the Settings panel (model, API key) |
 | `/help` | Show this help message |
@@ -428,7 +539,17 @@ class ChatApp(App):
                     await chat.mount(Static("❌ Please provide a valid index number (e.g. `/past 1`).", classes="tool-msg"))
             chat.scroll_end(animate=False)
             return
-                
+
+        if user_text.lower() in ["/commit", "commit"]:
+            self.query_one(Input).value = ""
+            self.run_worker(self._handle_commit(), exclusive=False)
+            return
+
+        if user_text.lower() in ["/pr", "pr"]:
+            self.query_one(Input).value = ""
+            self.run_worker(self._handle_pr(), exclusive=False)
+            return
+
         self.query_one(Input).value = ""
         chat = self.query_one("#chat-container", VerticalScroll)
         await chat.mount(Static(f"❯ You: {user_text}", classes="user-msg"))
@@ -438,8 +559,110 @@ class ChatApp(App):
         self.query_one(Input).disabled = True
         self.process_agent(user_text)
 
+    async def _handle_commit(self) -> None:
+        """Stage all changes, generate an AI commit message, show preview modal, commit."""
+        from pathlib import Path
+        from utils.git import (
+            is_git_repo, stage_all, get_staged_diff,
+            generate_commit_message, commit as git_commit,
+        )
+        chat = self.query_one("#chat-container", VerticalScroll)
+        cwd = Path.cwd()
+
+        if not await is_git_repo(cwd):
+            await chat.mount(Static("❌ Not a git repository.", classes="tool-msg"))
+            return
+
+        await chat.mount(Static("⏳ Staging all changes...", classes="system-msg"))
+        chat.scroll_end(animate=False)
+        await stage_all(cwd)
+
+        diff = await get_staged_diff(cwd)
+        if not diff.strip():
+            await chat.mount(Static("ℹ️ Nothing to commit — working tree is clean.", classes="system-msg"))
+            return
+
+        await chat.mount(Static("🤖 Generating commit message...", classes="system-msg"))
+        chat.scroll_end(animate=False)
+
+        msg = await generate_commit_message(diff, self.agent.client)
+        if not msg:
+            await chat.mount(Static("⚠️ AI returned an empty message. Aborting.", classes="tool-msg"))
+            return
+
+        final_msg = await self.push_screen_wait(GitCommitScreen(msg))
+        if not final_msg:
+            await chat.mount(Static("❌ Commit cancelled.", classes="system-msg"))
+            return
+
+        success, output = await git_commit(final_msg, cwd)
+        icon = "✅" if success else "❌"
+        await chat.mount(Static(f"{icon} {output}", classes="system-msg" if success else "tool-msg"))
+        chat.scroll_end(animate=False)
+
+    async def _handle_pr(self) -> None:
+        """Generate an AI PR description and create a GitHub PR via gh CLI."""
+        from pathlib import Path
+        from utils.git import (
+            is_git_repo, get_current_branch, get_branch_diff_vs_main,
+            get_branch_commits, generate_pr_description, has_gh_cli, create_pr,
+        )
+        chat = self.query_one("#chat-container", VerticalScroll)
+        cwd = Path.cwd()
+
+        if not await is_git_repo(cwd):
+            await chat.mount(Static("❌ Not a git repository.", classes="tool-msg"))
+            return
+
+        if not await has_gh_cli():
+            await chat.mount(Static(
+                "❌ GitHub CLI (`gh`) not installed or not authenticated.\n"
+                "Install: https://cli.github.com  then run `gh auth login`.",
+                classes="tool-msg"
+            ))
+            return
+
+        branch = await get_current_branch(cwd)
+        if branch in ("main", "master", "HEAD"):
+            await chat.mount(Static(
+                f"⚠️ You are on `{branch}`. Switch to a feature branch first.",
+                classes="tool-msg"
+            ))
+            return
+
+        await chat.mount(Static(f"⏳ Analysing branch `{branch}` vs main...", classes="system-msg"))
+        chat.scroll_end(animate=False)
+
+        commits = await get_branch_commits(cwd)
+        diff = await get_branch_diff_vs_main(cwd)
+
+        if not commits and not diff:
+            await chat.mount(Static("ℹ️ No commits ahead of main. Nothing to PR.", classes="system-msg"))
+            return
+
+        await chat.mount(Static("🤖 Generating PR description...", classes="system-msg"))
+        chat.scroll_end(animate=False)
+
+        title, body = await generate_pr_description(commits, diff, branch, self.agent.client)
+
+        screen = GitPRScreen(title, body)
+        confirmed = await self.push_screen_wait(screen)
+        if not confirmed:
+            await chat.mount(Static("❌ PR creation cancelled.", classes="system-msg"))
+            return
+
+        final_title = screen.get_title() or title
+        final_body = screen.get_body() or body
+
+        await chat.mount(Static("🚀 Creating PR on GitHub...", classes="system-msg"))
+        success, output = await create_pr(final_title, final_body, cwd)
+        icon = "✅" if success else "❌"
+        await chat.mount(Static(f"{icon} {output}", classes="system-msg" if success else "tool-msg"))
+        chat.scroll_end(animate=False)
+
     @work
     async def action_launch_config(self) -> None:
+
         saved = await self.push_screen_wait(ConfigScreen())
         if saved:
             # Update ContextManager's mapped variables so they dynamically switch mid-thread without restarting!
