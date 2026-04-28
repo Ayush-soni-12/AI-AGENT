@@ -142,8 +142,8 @@ async def generate_commit_message(diff: str, client) -> str:
 
     result = []
     async for event in client.chat_completion(messages, tools=None, stream=True):
-        if event.type == StreamEventType.TEXT_DELTA:
-            result.append(event.data.content)
+        if event.type == StreamEventType.TEXT_DELTA and event.text_delta:
+            result.append(event.text_delta.content)
 
     return "".join(result).strip()
 
@@ -188,8 +188,8 @@ async def generate_pr_description(commits: str, diff: str, branch: str, client) 
 
     raw = []
     async for event in client.chat_completion(messages, tools=None, stream=True):
-        if event.type == StreamEventType.TEXT_DELTA:
-            raw.append(event.data.content)
+        if event.type == StreamEventType.TEXT_DELTA and event.text_delta:
+            raw.append(event.text_delta.content)
 
     text = "".join(raw).strip()
 
