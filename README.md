@@ -59,4 +59,4 @@ Just add your MCP servers to `~/.config/neuralclaude/mcp_servers.json`:
 ```
 
 
-Once configured, launch `neuralclaude` and type `/mcp` to see all connected tools!
+Once configured, launch `neuralclaude` and type `/mcp` to see all connected tools!# PR test
