@@ -605,7 +605,8 @@ class ChatApp(App):
         from pathlib import Path
         from utils.git import (
             is_git_repo, get_current_branch, get_branch_diff_vs_main,
-            get_branch_commits, generate_pr_description, has_gh_cli, create_pr,
+            get_branch_commits, generate_pr_description, has_gh_cli, 
+            create_pr, push_branch,
         )
         chat = self.query_one("#chat-container", VerticalScroll)
         cwd = Path.cwd()
@@ -653,6 +654,13 @@ class ChatApp(App):
 
         final_title = screen.get_title() or title
         final_body = screen.get_body() or body
+
+        await chat.mount(Static(f"🚀 Pushing branch `{branch}` to origin...", classes="system-msg"))
+        chat.scroll_end(animate=False)
+        push_success, push_out = await push_branch(branch, cwd)
+        if not push_success:
+            await chat.mount(Static(f"❌ Failed to push branch:\n{push_out}", classes="tool-msg"))
+            return
 
         await chat.mount(Static("🚀 Creating PR on GitHub...", classes="system-msg"))
         success, output = await create_pr(final_title, final_body, cwd)

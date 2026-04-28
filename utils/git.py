@@ -52,6 +52,13 @@ async def stage_all(cwd: Path) -> bool:
     return code == 0
 
 
+async def push_branch(branch: str, cwd: Path) -> tuple[bool, str]:
+    """Push the current branch to origin. Returns (success, output)."""
+    # Use -u to set upstream if it's the first time
+    code, out, err = await _run_git(["push", "-u", "origin", branch], cwd)
+    return code == 0, out or err
+
+
 async def commit(message: str, cwd: Path) -> tuple[bool, str]:
     """Commit staged changes with message. Returns (success, output)."""
     code, out, err = await _run_git(["commit", "-m", message], cwd)
