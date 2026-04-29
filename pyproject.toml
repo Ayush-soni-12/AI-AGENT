@@ -24,6 +24,12 @@ dependencies = [
     "tiktoken"
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
 [project.scripts]
 neuralclaude = "main:main"
 
@@ -34,3 +40,6 @@ include = ["ui*", "agent*", "prompt*", "config*", "client*", "context*", "tools*
 [tool.setuptools]
 py-modules = ["main"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
