@@ -6,6 +6,7 @@ from tools.built_in.replace import ReplaceInFileTool
 from tools.built_in.list_dir import ListDirTool
 from tools.built_in.grep_search import GrepTool
 from tools.built_in.web_search import WebSearchTool
+from tools.built_in.test_runner import RunTestsTool
 
 __all__ = [
     "ReadFileTool",
@@ -16,6 +17,7 @@ __all__ = [
     "ListDirTool",
     "GrepTool",
     "WebSearchTool",
+    "RunTestsTool",
 ]
 
 
@@ -29,4 +31,5 @@ def get_all_builtin_tools() -> list[type]:
         ListDirTool,
         GrepTool,
         WebSearchTool,
+        RunTestsTool,
     ]

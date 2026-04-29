@@ -308,7 +308,7 @@ class ChatApp(App):
         yield Header(show_clock=True)
         yield VerticalScroll(id="chat-container")
         
-        commands = ["/help", "/mcp", "/commit", "/pr", "/config", "/new", "/past", "/clear", "/clear memory", "exit", "quit"]
+        commands = ["/help", "/mcp", "/commit", "/pr", "/test", "/config", "/new", "/past", "/clear", "/clear memory", "exit", "quit"]
         yield Input(
             placeholder="Ask Neural Claude... (Type '/' for commands)", 
             id="prompt",
@@ -446,6 +446,7 @@ class ChatApp(App):
 | `/clear memory` | Clear the screen AND wipe ALL project data (memory + sessions) |
 | `/commit` | AI writes a commit message for your changes, opens preview |
 | `/pr` | AI writes a PR title + description, opens preview to create PR |
+| `/test` | Run project tests/linter; if they fail the agent auto-fixes and retries |
 | `/mcp` | Show connected MCP servers and their available tools |
 | `/config` | Open the Settings panel (model, API key) |
 | `/help` | Show this help message |
@@ -543,6 +544,23 @@ class ChatApp(App):
         if user_text.lower() in ["/commit", "commit"]:
             self.query_one(Input).value = ""
             self.run_worker(self._handle_commit(), exclusive=False)
+            return
+
+        if user_text.lower() in ["/test", "test"]:
+            self.query_one(Input).value = ""
+            # Dispatch as a regular agent task so the LLM can see
+            # the output and self-correct in a natural agentic loop
+            test_prompt = (
+                "Run the project tests now using the `run_tests` tool. "
+                "If they fail, read the errors, fix the root cause in the code, "
+                "then call `run_tests` again. Repeat until they pass (max 3 attempts). "
+                "Report the final status."
+            )
+            chat = self.query_one("#chat-container", VerticalScroll)
+            await chat.mount(Static("🧪 Running tests...", classes="system-msg"))
+            chat.scroll_end(animate=False)
+            self.query_one(Input).disabled = True
+            self.process_agent(test_prompt)
             return
 
         if user_text.lower() in ["/pr", "pr"]:

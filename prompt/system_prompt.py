@@ -85,8 +85,15 @@ def _get_operational_section() -> str:
 1. Understand — use `list_dir`, `grep_search`, `read_file` to explore first.
 2. Plan — form a clear, grounded plan before editing.
 3. Implement — follow the project's existing conventions.
-4. Verify — run linting/tests if the project has them.
+4. Test — call `run_tests` immediately after any code change (see below).
 5. Finalize — stay until the task is completely resolved. Never give up early.
+
+**Testing (MANDATORY):**
+- After writing or modifying ANY code file, call `run_tests` immediately.
+- If `run_tests` returns STATUS: FAILED, read the errors carefully, fix the root cause, then call `run_tests` again.
+- Repeat up to 3 times. If still failing after 3 attempts, show the user the final error and ask for guidance.
+- Never say "done" or "complete" until `run_tests` returns STATUS: PASSED or STATUS: NO_TESTS.
+- If the project has no tests yet, skip silently — do not create test files unless asked.
 
 **Tool rules:**
 - Run independent tool calls in parallel.
@@ -103,3 +110,4 @@ def _get_operational_section() -> str:
 - Keep changes minimal and consistent with existing style.
 - No copyright headers unless asked.
 - No inline comments unless asked."""
+
