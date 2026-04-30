@@ -7,8 +7,8 @@ from typing import Any
 @dataclass
 class MessageItem:
     role:str
-    content:str
-    token_count:str
+    content:Any
+    token_count:int
     tool_calls: list[dict] | None = None
     tool_call_id: str | None = None
     name: str | None = None
@@ -66,11 +66,21 @@ class ContextManager:
         except Exception:
             pass
 
-    def add_user_message(self,content:str) -> None:
+    def add_user_message(self,content:Any) -> None:
+        if isinstance(content, str):
+            t_count = count_tokens(self._model_name, content)
+        else:
+            t_count = 0
+            for item in content:
+                if item.get("type") == "text":
+                    t_count += count_tokens(self._model_name, item.get("text", ""))
+                elif item.get("type") == "image_url":
+                    t_count += 258 # Approximate token count for an image
+        
         item = MessageItem(
             role='user',
             content=content,
-            token_count=count_tokens(self._model_name,content)
+            token_count=t_count
         )
         self._messages.append(item)
         self._save_session()

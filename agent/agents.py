@@ -49,14 +49,49 @@ class Agent:
 
 
 
-    async def run(self , message:str) -> AsyncGenerator[AgentEvent,None]:
-        yield AgentEvent.agent_start(message)
+    def _parse_message(self, text: str) -> Any:
+        import pathlib
+        import mimetypes
+        import shlex
 
-        self.context_manager.add_user_message(message)
+        try:
+            words = shlex.split(text)
+        except ValueError:
+            words = text.split()
+
+        images = []
+        for word in words:
+            clean_word = word.strip(" ,.;:!?\"'")
+            try:
+                p = pathlib.Path(clean_word).resolve()
+                if p.exists() and p.is_file():
+                    mime, _ = mimetypes.guess_type(str(p))
+                    if mime and mime.startswith("image/"):
+                        images.append(str(p))
+            except Exception:
+                pass
+                
+        if not images:
+            return text
+            
+        content = [{"type": "text", "text": text}]
+        for img in images:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"file://{img}"}
+            })
+        return content
+
+    async def run(self , message:str) -> AsyncGenerator[AgentEvent,None]:
+        parsed_message = self._parse_message(message)
+        yield AgentEvent.agent_start(str(parsed_message))
+
+        self.context_manager.add_user_message(parsed_message)
         
         final_response = None
-        async for event in self._agentic_loop(message):
+        async for event in self._agentic_loop(parsed_message):
             yield event
+
             
             if event.type == AgentEventType.TEXT_COMPLETE:
                 final_response = event.data.get("content")
@@ -64,7 +99,7 @@ class Agent:
         yield AgentEvent.agent_end(final_response)
        
 
-    async def _agentic_loop(self, message:str) -> AsyncGenerator[AgentEvent,None]:
+    async def _agentic_loop(self, message: Any) -> AsyncGenerator[AgentEvent,None]:
         import json
         tool_schema = self.tool_registry.get_schema()
 

@@ -49,13 +49,44 @@ class LLMClient:
         ]
 
 
+    async def _process_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        import base64
+        import mimetypes
+        from pathlib import Path
+        
+        processed = []
+        for msg in messages:
+            new_msg = dict(msg)
+            if isinstance(new_msg.get("content"), list):
+                new_content = []
+                for item in new_msg["content"]:
+                    new_item = dict(item)
+                    if new_item.get("type") == "image_url":
+                        url = new_item["image_url"]["url"]
+                        if url.startswith("file://"):
+                            filepath = Path(url[7:])
+                            if filepath.exists() and filepath.is_file():
+                                mime_type, _ = mimetypes.guess_type(str(filepath))
+                                mime_type = mime_type or "image/jpeg"
+                                try:
+                                    b64_data = base64.b64encode(filepath.read_bytes()).decode('utf-8')
+                                    new_item["image_url"] = {"url": f"data:{mime_type};base64,{b64_data}"}
+                                except Exception:
+                                    pass # Fall back to original or just let it fail
+                    new_content.append(new_item)
+                new_msg["content"] = new_content
+            processed.append(new_msg)
+        return processed
+
     async def chat_completion(self,messages:list[dict[str,Any]],tools:list[dict[str,Any]] | None = None,stream:bool = True)->AsyncGenerator[StreamEvent,None]:
         client = self.get_client()
         from config.config import config_mgr
         
+        processed_msgs = await self._process_messages(messages)
+        
         kwargs = {
             "model": config_mgr.get("model", "gemini-2.5-flash"),
-            "messages":messages,
+            "messages":processed_msgs,
             "stream":stream,
             }
         if tools:
