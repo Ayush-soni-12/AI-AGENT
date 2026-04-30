@@ -47,9 +47,27 @@ class WriteFileTool(Tool):
         params = WriteFileParams(**invocation.params)
         path = resolve_path(invocation.cwd, params.path)
 
+        old_content = ""
+        is_new_file = True
+        
+        if path.exists() and path.is_file():
+            try:
+                old_content = path.read_text(encoding="utf-8")
+                is_new_file = False
+            except Exception:
+                old_content = "[Binary or unreadable file]"
+
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(params.content, encoding="utf-8")
-            return ToolResult.success_result(f"Successfully wrote {len(params.content)} characters to {path}")
+            
+            diff = FileDiff(
+                path=path,
+                old_content=old_content,
+                new_content=params.content,
+                is_new_file=is_new_file
+            )
+            
+            return ToolResult.success_result(f"Successfully wrote {len(params.content)} characters to {path}", diff=diff)
         except Exception as e:
             return ToolResult.error_result(f"Failed to write file: {e}")

@@ -742,7 +742,11 @@ class ChatApp(App):
 
                 elif event.type == AgentEventType.TOOL_RESULT:
                     name = event.data.get("name")
+                    diff_str = event.data.get("diff")
                     await chat.mount(Static(f"✅ Tool {name} Finished!", classes="tool-msg"))
+                    if diff_str:
+                        diff_md = Markdown(f"```diff\n{diff_str}\n```", classes="tool-msg")
+                        await chat.mount(diff_md)
                     chat.scroll_end(animate=False)
                     current_md = None
 

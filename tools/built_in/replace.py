@@ -63,6 +63,12 @@ class ReplaceInFileTool(Tool):
             
             path.write_text(new_content, encoding="utf-8")
             
-            return ToolResult.success_result(f"Successfully patched {path}")
+            diff = FileDiff(
+                path=path,
+                old_content=old_content,
+                new_content=new_content,
+            )
+            
+            return ToolResult.success_result(f"Successfully patched {path}", diff=diff)
         except Exception as e:
             return ToolResult.error_result(f"Failed to edit file: {e}")

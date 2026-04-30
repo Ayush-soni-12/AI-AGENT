@@ -68,10 +68,10 @@ class AgentEvent:
         )
 
     @classmethod
-    def tool_result(cls,name:str, result:str) -> AgentEvent:
+    def tool_result(cls,name:str, result:str, diff:str|None=None) -> AgentEvent:
         return cls(
             type=AgentEventType.TOOL_RESULT,
-            data={"name":name, "result":result},
+            data={"name":name, "result":result, "diff":diff},
         )
 
     @classmethod

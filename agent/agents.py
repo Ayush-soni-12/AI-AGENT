@@ -5,7 +5,7 @@ from client.response import StreamEventType
 from agent.event import AgentEvent,AgentEventType
 from context.manager import ContextManager
 from tools.registry import create_tool_registry
-
+from tools.base import ToolResult
 
 from typing import Any, AsyncGenerator, Callable, Awaitable
 
@@ -125,7 +125,6 @@ class Agent:
                                 approved = True
                                 
                             if not approved:
-                                from tools.base import ToolResult
                                 result = ToolResult.error_result("User explicitly denied permission to execute this tool. Please cancel the action, apologize, and ask for further instructions.")
                                 yield AgentEvent.tool_result(tool_name, result.to_model_output())
                                 self.context_manager.add_tool_message(tc["id"], tool_name, result.to_model_output())
@@ -135,10 +134,10 @@ class Agent:
                     result = await self.tool_registry.invoke(tool_name, params, None)
                 except json.JSONDecodeError as e:
                     yield AgentEvent.tool_call(tool_name, {"_raw_args": args})
-                    from tools.base import ToolResult
                     result = ToolResult.error_result(f"Failed to parse tool arguments as JSON: {e}")
                 
-                yield AgentEvent.tool_result(tool_name, result.to_model_output())
+                diff_str = result.diff.to_diff() if result.diff else None
+                yield AgentEvent.tool_result(tool_name, result.to_model_output(), diff=diff_str)
                 
                 # Save the tool output back into the AI's memory
                 self.context_manager.add_tool_message(tc["id"], tool_name, result.to_model_output())
