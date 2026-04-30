@@ -348,17 +348,22 @@ class ChatApp(App):
             pass
 
     def _update_token_display(self) -> None:
-        """Refresh the header subtitle with the live session token count."""
+        """Refresh the header subtitle with the live session token count and cache savings."""
         cm = self.agent.context_manager
         model = cm._model_name.split("/")[-1]
-        
+
         if cm.api_prompt_tokens > 0:
             total = cm.api_prompt_tokens + cm.api_completion_tokens
-            self.sub_title = (
-                f"󰊤 {model}  │  "
-                f"In: {cm.api_prompt_tokens:,}  Out: {cm.api_completion_tokens:,}  "
-                f"Total: {total:,} tokens"
-            )
+            parts = [
+                f"󰊤 {model}  │",
+                f"In: {cm.api_prompt_tokens:,}",
+                f"Out: {cm.api_completion_tokens:,}",
+                f"Total: {total:,}",
+            ]
+            if cm.api_cached_tokens > 0:
+                saved_pct = int((cm.api_cached_tokens / cm.api_prompt_tokens) * 100)
+                parts.append(f"⚡ {cm.api_cached_tokens:,} cached ({saved_pct}% saved)")
+            self.sub_title = "  ".join(parts)
         else:
             estimated = cm.get_total_tokens()
             self.sub_title = f"󰊤 {model}  │  ~{estimated:,} tokens (estimated)"

@@ -33,6 +33,7 @@ class ContextManager:
         # Always start fresh — user can resume old sessions with /past
         self.api_prompt_tokens: int = 0
         self.api_completion_tokens: int = 0
+        self.api_cached_tokens: int = 0
         self._inject_memory()
 
     def _get_latest_session(self) -> str | None:
@@ -103,10 +104,11 @@ class ContextManager:
         # Fallback: sum locally-estimated token counts if API hasn't reported yet
         return sum(item.token_count or 0 for item in self._messages)
 
-    def record_api_usage(self, prompt_tokens: int, completion_tokens: int) -> None:
+    def record_api_usage(self, prompt_tokens: int, completion_tokens: int, cached_tokens: int = 0) -> None:
         """Accumulate real API token usage from each LLM turn."""
         self.api_prompt_tokens += prompt_tokens
         self.api_completion_tokens += completion_tokens
+        self.api_cached_tokens += cached_tokens
 
     def get_messages(self) -> list[dict[str, Any]]:
         messages =[]
@@ -153,6 +155,7 @@ class ContextManager:
         self._messages = []
         self.api_prompt_tokens = 0
         self.api_completion_tokens = 0
+        self.api_cached_tokens = 0
 
     def delete_all_sessions(self) -> int:
         """Delete every session JSON file in sessions_dir. Returns count deleted."""

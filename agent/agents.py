@@ -86,6 +86,7 @@ class Agent:
                         self.context_manager.record_api_usage(
                             prompt_tokens=event.usage.prompt_token or 0,
                             completion_tokens=event.usage.completion_token or 0,
+                            cached_tokens=event.usage.cached_token or 0,
                         )
                 elif event.type == StreamEventType.ERROR:
                     yield AgentEvent.agent_error(event.error)
