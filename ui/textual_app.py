@@ -4,6 +4,7 @@ from textual.widgets import Header, Footer, Input, Markdown, Static, Label, Butt
 from textual.containers import VerticalScroll, Grid, Vertical
 from textual.screen import ModalScreen
 from textual import work
+from textual.events import Paste
 from agent.event import AgentEventType
 
 
@@ -406,6 +407,22 @@ class ChatApp(App):
         result = await self.push_screen_wait(ConfirmScreen(msg))
         return result
 
+    def on_paste(self, event: Paste) -> None:
+        """Capture drag-and-drop or terminal pastes and append to the input box."""
+        inp = self.query_one(Input)
+        
+        # When dragging a file, terminals often surround the path in single quotes
+        # We strip surrounding whitespace and single quotes for clean file paths
+        pasted_text = event.text.strip()
+        if pasted_text.startswith("'") and pasted_text.endswith("'"):
+            pasted_text = pasted_text[1:-1]
+            
+        if pasted_text:
+            if inp.value and not inp.value.endswith(" "):
+                inp.value += " "
+            inp.value += pasted_text
+            inp.focus()
+            
     async def on_input_submitted(self, message: Input.Submitted) -> None:
         if not message.value.strip(): return
         
