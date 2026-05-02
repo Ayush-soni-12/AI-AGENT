@@ -129,12 +129,16 @@ class ConfirmScreen(ModalScreen[bool]):
         padding: 1;
         width: 80;
         height: auto;
+        max-height: 80%;
         border: thick red;
         background: $surface;
     }
-    #question {
+    #question-container {
         column-span: 2;
         height: auto;
+        max-height: 100%;
+    }
+    #question {
         width: 1fr;
         color: yellow;
         text-style: bold;
@@ -149,7 +153,7 @@ class ConfirmScreen(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         yield Grid(
-            Label(self.message, id="question"),
+            VerticalScroll(Label(self.message, id="question"), id="question-container"),
             Button("Deny (n)", variant="error", id="deny"),
             Button("Approve (y)", variant="success", id="approve"),
             id="dialog",
