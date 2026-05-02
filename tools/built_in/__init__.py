@@ -1,5 +1,5 @@
 from tools.built_in.read_file import ReadFileTool
-from tools.built_in.shell import ShellTool
+from tools.built_in.shell import ShellTool, GetLogsTool
 from tools.built_in.write_file import WriteFileTool
 from tools.built_in.memory import MemoryTool
 from tools.built_in.replace import ReplaceInFileTool
@@ -13,6 +13,7 @@ from tools.built_in.artifact import ArtifactTool
 __all__ = [
     "ReadFileTool",
     "ShellTool",
+    "GetLogsTool",
     "WriteFileTool",
     "MemoryTool",
     "ReplaceInFileTool",
@@ -29,6 +30,7 @@ def get_all_builtin_tools() -> list[type]:
     return [
         ReadFileTool,
         ShellTool,
+        GetLogsTool,
         WriteFileTool,
         MemoryTool,
         ReplaceInFileTool,

@@ -3,6 +3,7 @@ from typing import Any , AsyncGenerator
 from client.llm_client import LLMClient
 from client.response import StreamEventType
 from agent.event import AgentEvent,AgentEventType
+from agent.process_manager import ProcessManager
 from context.manager import ContextManager
 from tools.registry import create_tool_registry
 from tools.base import ToolResult
@@ -14,6 +15,7 @@ class Agent:
     def __init__(self, confirm_callback: Callable[[Any], Awaitable[bool]] | None = None):
         self.client = LLMClient()
         self.context_manager = ContextManager()
+        self.process_manager = ProcessManager()
         self._confirm_callback = confirm_callback
 
         # MCPManager is created empty here; connect_mcp() must be awaited
@@ -160,7 +162,7 @@ class Agent:
                     if tool_instance:
                         from tools.base import ToolInvocation
                         import pathlib
-                        invocation = ToolInvocation(params=params, cwd=pathlib.Path.cwd())
+                        invocation = ToolInvocation(params=params, cwd=pathlib.Path.cwd(), agent=self)
                         confirmation = await tool_instance.get_confirmation(invocation)
                         
                         if confirmation:
@@ -178,7 +180,7 @@ class Agent:
                                 continue
 
                     # Run the actual python code
-                    result = await self.tool_registry.invoke(tool_name, params, None)
+                    result = await self.tool_registry.invoke(tool_name, params, None, agent=self)
                 except json.JSONDecodeError as e:
                     yield AgentEvent.tool_call(tool_name, {"_raw_args": args})
                     result = ToolResult.error_result(f"Failed to parse tool arguments as JSON: {e}")

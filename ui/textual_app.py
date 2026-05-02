@@ -1,7 +1,7 @@
 import json
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Markdown, Static, Label, Button, TextArea
-from textual.containers import VerticalScroll, Grid, Vertical
+from textual.widgets import Header, Footer, Input, Markdown, Static, Label, Button, TextArea, RichLog
+from textual.containers import VerticalScroll, Grid, Vertical, Horizontal
 from textual.screen import ModalScreen
 from textual import work
 from textual.events import Paste
@@ -261,12 +261,23 @@ class ChatApp(App):
     Screen {
         align: center middle;
     }
+    #main-layout {
+        height: 1fr;
+    }
     #chat-container {
+        width: 65%;
         height: 1fr;
         border: solid cyan;
-        margin: 1;
         padding: 1;
         overflow-y: scroll;
+    }
+    #log-panel {
+        width: 35%;
+        height: 1fr;
+        border: solid yellow;
+        padding: 0 1;
+        background: $surface;
+        color: $text-muted;
     }
     Input {
         dock: bottom;
@@ -311,8 +322,11 @@ class ChatApp(App):
     def compose(self) -> ComposeResult:
         from textual.suggester import SuggestFromList
         yield Header(show_clock=True)
-        yield VerticalScroll(id="chat-container")
         
+        with Horizontal(id="main-layout"):
+            yield VerticalScroll(id="chat-container")
+            yield RichLog(id="log-panel", highlight=True, markup=False, wrap=True)
+
         commands = ["/help", "/mcp", "/commit", "/pr", "/test", "/config", "/new", "/past", "/clear", "/clear memory", "exit", "quit"]
         yield Input(
             placeholder="Ask Neural Claude... (Type '/' for commands)", 
@@ -326,8 +340,20 @@ class ChatApp(App):
         chat = self.query_one("#chat-container", VerticalScroll)
         chat.mount(Static("⚡ Neural Claude ready. Type /help to see available commands.", classes="system-msg"))
         self._update_token_display()
+        
+        # Wire up process logs to the log panel
+        self.agent.process_manager.set_log_callback(self._on_process_log)
+        
         # Connect to MCP servers inside Textual's event loop to avoid anyio scope issues
         self.run_worker(self._start_mcp_worker(), exclusive=False)
+
+    def _on_process_log(self, message: str) -> None:
+        """Callback from ProcessManager to update the UI log panel."""
+        try:
+            log_panel = self.query_one("#log-panel", RichLog)
+            log_panel.write(message)
+        except:
+            pass
 
     async def _start_mcp_worker(self):
         """Connect MCP servers in the same event loop as Textual."""

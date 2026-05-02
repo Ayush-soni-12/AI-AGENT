@@ -93,6 +93,7 @@ class ToolResult:
 class ToolInvocation:
     params: dict[str, Any]
     cwd: Path
+    agent: Any = None
 
 
 @dataclass

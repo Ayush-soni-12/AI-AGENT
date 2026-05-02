@@ -44,7 +44,7 @@ class ToolRegistry:
 
         
 
-    async def invoke(self,name:str,params:dict[str,Any],cwd:Path| None):
+    async def invoke(self, name: str, params: dict[str, Any], cwd: Path | None, agent: Any = None):
         tool = self.get(name)
 
         if tool is None:
@@ -55,7 +55,7 @@ class ToolRegistry:
             return ToolResult.error_result(f"Validation error: {validataton_error}",metadata={'tool_name':name})
 
 
-        invocation = ToolInvocation(params=params,cwd=cwd or Path.cwd())
+        invocation = ToolInvocation(params=params, cwd=cwd or Path.cwd(), agent=agent)
 
         try:
             result = await tool.execute(invocation)
