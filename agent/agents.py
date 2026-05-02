@@ -66,7 +66,7 @@ class Agent:
                 p = pathlib.Path(clean_word).resolve()
                 if p.exists() and p.is_file():
                     mime, _ = mimetypes.guess_type(str(p))
-                    if mime and mime.startswith("image/"):
+                    if mime and mime.startswith("image/") and not mime.endswith("svg+xml"):
                         images.append(str(p))
             except Exception:
                 pass
@@ -127,7 +127,19 @@ class Agent:
                     yield AgentEvent.agent_error(event.error)
                     return # Exit loop completely on error
 
-            self.context_manager.add_assistant_message(response_text or None, tool_calls=tool_calls)
+            import copy
+            saved_tool_calls = copy.deepcopy(tool_calls) if tool_calls else None
+            if saved_tool_calls:
+                for tc in saved_tool_calls:
+                    args = tc.get("function", {}).get("arguments", "")
+                    if args:
+                        try:
+                            json.loads(args)
+                        except json.JSONDecodeError:
+                            # Gemini's backend API crashes if invalid JSON is passed back in assistant history
+                            tc["function"]["arguments"] = '{"error": "invalid_json_redacted"}'
+
+            self.context_manager.add_assistant_message(response_text or None, tool_calls=saved_tool_calls)
             
             if response_text:
                 yield AgentEvent.text_complete(response_text)
@@ -172,10 +184,21 @@ class Agent:
                     result = ToolResult.error_result(f"Failed to parse tool arguments as JSON: {e}")
                 
                 diff_str = result.diff.to_diff() if result.diff else None
-                yield AgentEvent.tool_result(tool_name, result.to_model_output(), diff=diff_str)
+                out_str = result.to_model_output()
+                parsed_out = self._parse_message(out_str)
+                yield AgentEvent.tool_result(tool_name, out_str, diff=diff_str)
                 
-                # Save the tool output back into the AI's memory
-                self.context_manager.add_tool_message(tc["id"], tool_name, result.to_model_output())
+                if isinstance(parsed_out, list):
+                    # Tool returned an image! Tool messages must be text only.
+                    self.context_manager.add_tool_message(tc["id"], tool_name, out_str)
+                    
+                    # Inject a user message containing the actual image payload
+                    image_parts = [p for p in parsed_out if p.get("type") == "image_url"]
+                    if image_parts:
+                        user_content = [{"type": "text", "text": f"System Image Injection for tool {tool_name}:"}] + image_parts
+                        self.context_manager.add_user_message(user_content)
+                else:
+                    self.context_manager.add_tool_message(tc["id"], tool_name, out_str)
 
             # Loop automatically continues since while True!
 

@@ -95,11 +95,21 @@ class ContextManager:
         self._messages.append(item)
         self._save_session()
 
-    def add_tool_message(self, tool_call_id: str, name: str, content: str) -> None:
+    def add_tool_message(self, tool_call_id: str, name: str, content: Any) -> None:
+        if isinstance(content, str):
+            t_count = count_tokens(self._model_name, content)
+        else:
+            t_count = 0
+            for item in content:
+                if item.get("type") == "text":
+                    t_count += count_tokens(self._model_name, item.get("text", ""))
+                elif item.get("type") == "image_url":
+                    t_count += 258
+
         item = MessageItem(
             role='tool',
             content=content,
-            token_count=count_tokens(self._model_name, content),
+            token_count=t_count,
             tool_call_id=tool_call_id,
             name=name
         )
@@ -126,7 +136,13 @@ class ContextManager:
             messages.append({"role":"system", "content":self._system_prompt})
 
         for item in self._messages:
-            msg = {"role":item.role, "content":item.content}
+            content = item.content
+            # Sanitize old corrupted tool messages that might contain lists
+            if item.role == "tool" and isinstance(content, list):
+                text_parts = [p.get("text", "") for p in content if p.get("type") == "text"]
+                content = " ".join(text_parts)
+                
+            msg = {"role":item.role, "content":content}
             if item.tool_calls:
                 msg["tool_calls"] = item.tool_calls
             if item.tool_call_id:
