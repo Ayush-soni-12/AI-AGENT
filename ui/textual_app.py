@@ -757,14 +757,14 @@ class ChatApp(App):
                     except:
                         args_str = str(args)
                     msg_text = f"⚙️ Thinking... Calling Tool: {name}\n{args_str}"
-                    await chat.mount(Static(msg_text, classes="tool-msg"))
+                    await chat.mount(Static(msg_text, classes="tool-msg", markup=False))
                     chat.scroll_end(animate=False)
                     current_md = None
 
                 elif event.type == AgentEventType.TOOL_RESULT:
                     name = event.data.get("name")
                     diff_str = event.data.get("diff")
-                    await chat.mount(Static(f"✅ Tool {name} Finished!", classes="tool-msg"))
+                    await chat.mount(Static(f"✅ Tool {name} Finished!", classes="tool-msg", markup=False))
                     if diff_str:
                         diff_md = Markdown(f"```diff\n{diff_str}\n```", classes="tool-msg")
                         await chat.mount(diff_md)
@@ -773,7 +773,7 @@ class ChatApp(App):
 
                 elif event.type == AgentEventType.AGENT_ERROR:
                     error = event.data.get("error","Unknown error")
-                    await chat.mount(Static(f"❌ Error: {error}", classes="tool-msg"))
+                    await chat.mount(Static(f"❌ Error: {error}", classes="tool-msg", markup=False))
                     chat.scroll_end(animate=False)
                     current_md = None
                     

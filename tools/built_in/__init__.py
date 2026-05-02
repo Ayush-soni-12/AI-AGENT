@@ -7,7 +7,7 @@ from tools.built_in.list_dir import ListDirTool
 from tools.built_in.grep_search import GrepTool
 from tools.built_in.web_search import WebSearchTool
 from tools.built_in.test_runner import RunTestsTool
-from tools.built_in.screenshot import ScreenshotTool
+from tools.built_in.screenshot import BrowserActionTool
 from tools.built_in.artifact import ArtifactTool
 
 __all__ = [
@@ -20,7 +20,7 @@ __all__ = [
     "GrepTool",
     "WebSearchTool",
     "RunTestsTool",
-    "ScreenshotTool",
+    "BrowserActionTool",
     "ArtifactTool",
 ]
 
@@ -36,6 +36,6 @@ def get_all_builtin_tools() -> list[type]:
         GrepTool,
         WebSearchTool,
         RunTestsTool,
-        ScreenshotTool,
+        BrowserActionTool,
         ArtifactTool,
     ]
