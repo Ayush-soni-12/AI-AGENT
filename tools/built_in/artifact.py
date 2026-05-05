@@ -8,7 +8,7 @@ from tools.base import Tool, ToolResult, ToolInvocation, ToolKind, ToolConfirmat
 
 class ArtifactParams(BaseModel):
     title: str = Field(..., description="The title of the artifact.")
-    artifact_type: str = Field(..., description="Type of artifact: 'implementation_plan', 'walkthrough', 'task', or 'other'.")
+    artifact_type: str = Field(..., description="Type of artifact: 'implementation_plan', 'walkthrough', 'roadmap', 'task', or 'other'.")
     summary: str = Field(..., description="A short summary of what this artifact contains.")
     content: str = Field(..., description="The Markdown content of the artifact.")
 
@@ -26,8 +26,8 @@ class ArtifactTool(Tool):
     async def get_confirmation(self, invocation: ToolInvocation) -> ToolConfirmation | None:
         params = ArtifactParams(**invocation.params)
         
-        # Only require user approval for implementation plans
-        if params.artifact_type != "implementation_plan":
+        # Require user approval for implementation plans AND roadmaps (since roadmaps define the whole project)
+        if params.artifact_type not in ["implementation_plan", "roadmap"]:
             return None
 
         # Create a faux FileDiff so the UI can beautifully render the plan text!
@@ -41,7 +41,7 @@ class ArtifactTool(Tool):
         return ToolConfirmation(
             tool_name=self.name,
             params=invocation.params,
-            description=f"📝 Implementation Plan Created: {params.title}\nPlease review the plan before the AI begins coding.",
+            description=f"📝 {params.artifact_type.replace('_', ' ').title()} Created: {params.title}\nPlease review the {params.artifact_type} before the AI proceeds.",
             diff=diff,
             affected_paths=[],
             is_dangerous=False
