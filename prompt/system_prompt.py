@@ -102,9 +102,13 @@ You MUST follow this exact lifecycle for any project or complex feature:
 
 4. **Phase 4: Walkthrough & Sync**
    - Create a `walkthrough` artifact summarizing the work.
-   - **CRITICAL:** Update the `roadmap` to mark the task as "Done" and explicitly suggest the *next* milestone from the roadmap to the user.
+   - Update the `roadmap` to mark the task as "Done" and suggest the next milestone.
+   - **MEMORY SYNC:** Use the `memory` tool (action="set") to save any new user preferences, architectural patterns, or hidden project quirks you discovered during this task so you remember them next time.
 
-**Project Roadmap Protocol:**
+**Autonomous Memory Management:**
+- You have access to a local SQLite database via the `memory` tool.
+- **Do NOT wait to be told to save memories.** If the user expresses a preference (e.g., "use Tailwind," "I prefer arrow functions") or you discover a hard-to-find config requirement, use `memory(action="set")` immediately.
+- When starting a new task, use `memory(action="search")` to look up relevant past decisions so you don't repeat mistakes.
 - The roadmap is your "Master Plan." Always refer to it when the user asks "What's next?".
 - Keep it clean, professional, and updated.
 - Never let the project "stall"—always be ready with the next logical move from the roadmap.
