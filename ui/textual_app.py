@@ -327,7 +327,7 @@ class ChatApp(App):
             yield VerticalScroll(id="chat-container")
             yield RichLog(id="log-panel", highlight=True, markup=False, wrap=True)
 
-        commands = ["/help", "/mcp", "/commit", "/pr", "/test", "/config", "/new", "/past", "/clear", "/clear memory", "exit", "quit"]
+        commands = ["/help", "/mcp", "/commit", "/pr", "/test", "/config", "/init", "/new", "/past", "/clear", "/clear memory", "/exit", "/quit"]
         yield Input(
             placeholder="Ask Neural Claude... (Type '/' for commands)", 
             id="prompt",
@@ -452,12 +452,12 @@ class ChatApp(App):
                 inp.value += " "
             inp.value += pasted_text
             inp.focus()
-            
+                    
     async def on_input_submitted(self, message: Input.Submitted) -> None:
         if not message.value.strip(): return
         
         user_text = message.value
-        if user_text.lower() in ["exit", "quit"]:
+        if user_text.lower() in ["/exit", "/quit"]:
             self.exit()
             return
 
@@ -492,6 +492,7 @@ class ChatApp(App):
 | Command | Description |
 |---|---|
 | `/new` | Branch into a fresh session thread (old thread saved to /past) |
+| `/init` | Initialize the project with AGENTS.md |
 | `/past` | List all saved session threads for this project |
 | `/past [N]` | Resume session thread number N |
 | `/clear` | Clear the screen only — session keeps going, nothing saved to /past |
@@ -596,6 +597,24 @@ class ChatApp(App):
         if user_text.lower() in ["/commit", "commit"]:
             self.query_one(Input).value = ""
             self.run_worker(self._handle_commit(), exclusive=False)
+            return
+
+        if user_text.lower() == "/init":
+            self.query_one(Input).value = ""
+            chat = self.query_one("#chat-container", VerticalScroll)
+            await chat.mount(Static("🔍 Analyzing repository to generate AGENTS.md...", classes="system-msg"))
+            chat.scroll_end(animate=False)
+            
+            init_prompt = (
+                "Please analyze this repository's structure and configuration files "
+                "(e.g., package.json, requirements.txt, framework configs). Based on your analysis, "
+                "write a comprehensive `AGENTS.md` file in the root directory. "
+                "This file should establish project-specific instructions, coding standards, styling rules, "
+                "and architectural patterns that you and future AI agents should follow in this repo. "
+                "Use the write_to_file tool to save it. When you finish, tell the user that the initialization is complete."
+            )
+            self.query_one(Input).disabled = True
+            self.process_agent(init_prompt)
             return
 
         if user_text.lower() in ["/test", "test"]:
