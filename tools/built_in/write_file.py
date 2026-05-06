@@ -33,6 +33,18 @@ class WriteFileTool(Tool):
             new_content=params.content,
             is_new_file=is_new_file
         )
+        
+        # IDE Preview generation
+        import os
+        is_ide = any(key in os.environ for key in ["VSCODE_PID", "JETBRAINS_IDE"]) or \
+                 os.environ.get("TERM_PROGRAM") in ["vscode", "cursor", "warp"]
+        if is_ide:
+            preview_path = path.with_name(f"{path.stem}.preview{path.suffix}")
+            try:
+                preview_path.parent.mkdir(parents=True, exist_ok=True)
+                preview_path.write_text(params.content, encoding="utf-8")
+            except Exception:
+                pass
 
         return ToolConfirmation(
             tool_name=self.name,

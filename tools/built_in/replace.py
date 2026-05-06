@@ -28,6 +28,17 @@ class ReplaceInFileTool(Tool):
         # Extract the patch natively
         if params.target_content in old_content:
             new_content = old_content.replace(params.target_content, params.replacement_content, 1)
+            
+            # IDE Preview generation
+            import os
+            is_ide = any(key in os.environ for key in ["VSCODE_PID", "JETBRAINS_IDE"]) or \
+                     os.environ.get("TERM_PROGRAM") in ["vscode", "cursor", "warp"]
+            if is_ide:
+                preview_path = path.with_name(f"{path.stem}.preview{path.suffix}")
+                try:
+                    preview_path.write_text(new_content, encoding="utf-8")
+                except Exception:
+                    pass
         else:
             new_content = old_content # If it errors out, Diff will just be blank so it's safe
 

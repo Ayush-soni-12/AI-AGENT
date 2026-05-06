@@ -433,9 +433,32 @@ class ChatApp(App):
                 diff_text = f"\n\n[Diff Preview]\n{diff_text}"
         
         msg = f"⚠️ ACTION REQUIRED: {confirmation.description}{diff_text}"
-        # Await the modal screen result natively mapped to user UI buttons!
-        result = await self.push_screen_wait(ConfirmScreen(msg))
-        return result
+        
+        import os
+        is_ide = any(key in os.environ for key in ["VSCODE_PID", "JETBRAINS_IDE"]) or \
+                 os.environ.get("TERM_PROGRAM") in ["vscode", "cursor", "warp"]
+                 
+        if not is_ide:
+            # Natively await the modal screen result
+            return await self.push_screen_wait(ConfirmScreen(msg))
+        else:
+            # Inline chat prompt for small IDE terminals
+            chat = self.query_one("#chat-container", VerticalScroll)
+            await chat.mount(Markdown(msg + "\n\n**[IDE Mode] Type `y` to approve or `n` to reject.**", classes="tool-msg"))
+            chat.scroll_end(animate=False)
+            
+            # Temporarily unlock input for the y/n response
+            inp = self.query_one(Input)
+            inp.disabled = False
+            inp.focus()
+            
+            import asyncio
+            self._awaiting_confirmation = asyncio.get_running_loop().create_future()
+            result = await self._awaiting_confirmation
+            
+            # Re-lock input as the agent resumes processing
+            inp.disabled = True
+            return result
 
     def on_paste(self, event: Paste) -> None:
         """Capture drag-and-drop or terminal pastes and append to the input box."""
@@ -457,6 +480,21 @@ class ChatApp(App):
         if not message.value.strip(): return
         
         user_text = message.value
+        
+        # Check if the agent is blocked waiting for a y/n inline confirmation
+        if hasattr(self, '_awaiting_confirmation') and self._awaiting_confirmation and not self._awaiting_confirmation.done():
+            self.query_one(Input).value = ""
+            chat = self.query_one("#chat-container", VerticalScroll)
+            if user_text.lower() in ['y', 'yes']:
+                await chat.mount(Static("✅ Approved inline.", classes="system-msg"))
+                self._awaiting_confirmation.set_result(True)
+            else:
+                await chat.mount(Static("❌ Rejected inline.", classes="system-msg"))
+                self._awaiting_confirmation.set_result(False)
+            self._awaiting_confirmation = None
+            chat.scroll_end(animate=False)
+            return
+
         if user_text.lower() in ["/exit", "/quit"]:
             self.exit()
             return

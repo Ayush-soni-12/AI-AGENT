@@ -173,6 +173,15 @@ class Agent:
                             else:
                                 approved = True
                                 
+                            # Cleanup IDE preview files regardless of approval status
+                            for p in getattr(confirmation, 'affected_paths', []):
+                                try:
+                                    preview_file = p.with_name(f"{p.stem}.preview{p.suffix}")
+                                    if preview_file.exists():
+                                        preview_file.unlink()
+                                except Exception:
+                                    pass
+                                
                             if not approved:
                                 result = ToolResult.error_result("User explicitly denied permission to execute this tool. Please cancel the action, apologize, and ask for further instructions.")
                                 yield AgentEvent.tool_result(tool_name, result.to_model_output())
