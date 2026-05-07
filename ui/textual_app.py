@@ -362,9 +362,8 @@ class ChatApp(App):
             if count > 0:
                 chat = self.query_one("#chat-container", VerticalScroll)
                 tools = self.agent.mcp_manager.get_all_tools()
-                names = ", ".join(f"`{t['name']}`" for t in tools)
                 await chat.mount(Static(
-                    f"🔌 MCP: {count} server(s) connected — {len(tools)} tool(s) available ({names})",
+                    f"🔌 MCP: {count} server(s) connected — {len(tools)} tool(s) available. Type /mcp to view them.",
                     classes="system-msg"
                 ))
         except Exception as e:
@@ -607,9 +606,9 @@ class ChatApp(App):
                 if not sessions:
                     await chat.mount(Static("📭 No past sessions found.", classes="system-msg"))
                 else:
-                    msg = "📚 **Past Sessions Thread Archive:**\n"
+                    msg = "📚 **Past Sessions Thread Archive:**\n\n"
                     for idx, s in enumerate(sessions):
-                        msg += f"**[{idx}]** {s['snippet']} (`{s['id'][:6]}`)\n"
+                        msg += f"* **[{idx}]** `{s['id'][:6]}` — {s['snippet']}\n"
                     msg += "\n*Type `/past [number]` to warp to a session.*"
                     await chat.mount(Markdown(msg, classes="system-msg"))
             else:
