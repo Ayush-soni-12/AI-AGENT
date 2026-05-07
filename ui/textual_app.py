@@ -327,7 +327,7 @@ class ChatApp(App):
             yield VerticalScroll(id="chat-container")
             yield RichLog(id="log-panel", highlight=True, markup=False, wrap=True)
 
-        commands = ["/help", "/mcp", "/commit", "/pr", "/test", "/config", "/init", "/new", "/past", "/clear", "/clear memory", "/exit", "/quit"]
+        commands = ["/help", "/mcp", "/commit", "/pr", "/test", "/status", "/config", "/init", "/new", "/past", "/clear", "/clear memory", "/exit", "/quit"]
         yield Input(
             placeholder="Ask Neural Claude... (Type '/' for commands)", 
             id="prompt",
@@ -653,6 +653,42 @@ class ChatApp(App):
             )
             self.query_one(Input).disabled = True
             self.process_agent(init_prompt)
+            return
+
+        if user_text.lower() in ["/status", "status"]:
+            self.query_one(Input).value = ""
+            chat = self.query_one("#chat-container", VerticalScroll)
+            
+            cm = self.agent.context_manager
+            model = cm._model_name.split("/")[-1]
+            total_tokens = cm.api_prompt_tokens + cm.api_completion_tokens
+            saved_pct = int((cm.api_cached_tokens / max(cm.api_prompt_tokens, 1)) * 100) if cm.api_cached_tokens > 0 else 0
+            
+            import os
+            import pathlib
+            cwd = pathlib.Path.cwd()
+            is_ide = any(key in os.environ for key in ["VSCODE_PID", "JETBRAINS_IDE"]) or os.environ.get("TERM_PROGRAM") in ["vscode", "cursor", "warp"]
+            
+            status_md = f"""
+## 📊 System Status
+
+**Environment**
+* **Active Model:** `{model}`
+* **Working Directory:** `{cwd}`
+* **IDE Detection:** `{"Active (Popups suppressed)" if is_ide else "Inactive (Native modals enabled)"}`
+
+**Session Statistics**
+* **Memory Nodes in Context:** `{len(cm._messages)}`
+* **Input Tokens:** `{cm.api_prompt_tokens:,}`
+* **Output Tokens:** `{cm.api_completion_tokens:,}`
+* **Total Tokens Used:** `{total_tokens:,}`
+* **Context Caching:** `{cm.api_cached_tokens:,} tokens ({saved_pct}% saved)`
+
+**Capabilities**
+* **Active Tools:** `{len(self.agent.tool_registry.get_tools())} functions available`
+"""
+            await chat.mount(Markdown(status_md, classes="system-msg"))
+            chat.scroll_end(animate=False)
             return
 
         if user_text.lower() in ["/test", "test"]:

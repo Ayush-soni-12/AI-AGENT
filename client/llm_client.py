@@ -88,7 +88,9 @@ class LLMClient:
             "model": config_mgr.get("model", "gemini-2.5-flash"),
             "messages":processed_msgs,
             "stream":stream,
-            }
+        }
+        if stream:
+            kwargs["stream_options"] = {"include_usage": True}
         if tools:
             kwargs["tools"] = self._build_tools(tools)
             kwargs["tool_choice"] = "auto"
