@@ -123,6 +123,16 @@ class ContextManager:
             return api_total
         # Fallback: sum locally-estimated token counts if API hasn't reported yet
         return sum(item.token_count or 0 for item in self._messages)
+        
+    @property
+    def max_context_tokens(self) -> int:
+        """Return the maximum context window size for the current model."""
+        if "gemini" in self._model_name.lower():
+            return 1_000_000
+        elif "claude" in self._model_name.lower():
+            return 200_000
+        else:
+            return 128_000
 
     def record_api_usage(self, prompt_tokens: int, completion_tokens: int, cached_tokens: int = 0) -> None:
         """Accumulate real API token usage from each LLM turn."""

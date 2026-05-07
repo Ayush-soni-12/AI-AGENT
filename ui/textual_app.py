@@ -327,7 +327,7 @@ class ChatApp(App):
             yield VerticalScroll(id="chat-container")
             yield RichLog(id="log-panel", highlight=True, markup=False, wrap=True)
 
-        commands = ["/help", "/mcp", "/commit", "/pr", "/test", "/status", "/config", "/init", "/new", "/past", "/clear", "/clear memory", "/exit", "/quit"]
+        commands = ["/help", "/mcp", "/commit", "/pr", "/test", "/status", "/compact", "/config", "/init", "/new", "/past", "/clear", "/clear memory", "/exit", "/quit"]
         yield Input(
             placeholder="Ask Neural Claude... (Type '/' for commands)", 
             id="prompt",
@@ -382,6 +382,10 @@ class ChatApp(App):
         """Refresh the header subtitle with the live session token count and cache savings."""
         cm = self.agent.context_manager
         model = cm._model_name.split("/")[-1]
+        
+        current_tokens = cm.get_total_tokens()
+        max_tokens = cm.max_context_tokens
+        pct = (current_tokens / max_tokens) * 100 if max_tokens > 0 else 0
 
         if cm.api_prompt_tokens > 0:
             total = cm.api_prompt_tokens + cm.api_completion_tokens
@@ -389,15 +393,15 @@ class ChatApp(App):
                 f"󰊤 {model}  │",
                 f"In: {cm.api_prompt_tokens:,}",
                 f"Out: {cm.api_completion_tokens:,}",
-                f"Total: {total:,}",
+                f"Total: {total:,} ({pct:.1f}%)",
             ]
             if cm.api_cached_tokens > 0:
-                saved_pct = int((cm.api_cached_tokens / cm.api_prompt_tokens) * 100)
+                saved_pct = int((cm.api_cached_tokens / max(cm.api_prompt_tokens, 1)) * 100)
                 parts.append(f"⚡ {cm.api_cached_tokens:,} cached ({saved_pct}% saved)")
             self.sub_title = "  ".join(parts)
         else:
             estimated = cm.get_total_tokens()
-            self.sub_title = f"󰊤 {model}  │  ~{estimated:,} tokens (estimated)"
+            self.sub_title = f"󰊤 {model}  │  ~{estimated:,} tokens ({pct:.1f}%)"
 
     def _wipe_project_data(self) -> str:
         """Wipe ALL project data: memory DB + all session files + reset active session."""
@@ -655,6 +659,11 @@ class ChatApp(App):
             self.process_agent(init_prompt)
             return
 
+        if user_text.lower() in ["/compact", "compact"]:
+            self.query_one(Input).value = ""
+            self.run_worker(self._handle_compact(), exclusive=False)
+            return
+
         if user_text.lower() in ["/status", "status"]:
             self.query_one(Input).value = ""
             chat = self.query_one("#chat-container", VerticalScroll)
@@ -718,9 +727,64 @@ class ChatApp(App):
         await chat.mount(Static(f"❯ You: {user_text}", classes="user-msg"))
         chat.scroll_end(animate=False)
         
-        # Disable input while processing
         self.query_one(Input).disabled = True
         self.process_agent(user_text)
+
+    async def _handle_compact(self) -> None:
+        """Summarize the entire chat history and wipe the memory to save tokens."""
+        chat = self.query_one("#chat-container", VerticalScroll)
+        cm = self.agent.context_manager
+        
+        await chat.mount(Static("🗜️ Compacting context window...", classes="system-msg"))
+        chat.scroll_end(animate=False)
+        self.query_one(Input).disabled = True
+        
+        prompt = (
+            "Please read our entire conversation history. "
+            "Write a highly detailed technical summary of everything we have discussed, decided, and built so far. "
+            "Include the current state of the project, any pending tasks, and specific architectural choices. "
+            "Format this as a dense, bulleted summary. "
+            "Do NOT write any code, just the summary."
+        )
+        
+        messages = cm.get_messages()
+        messages.append({"role": "user", "content": prompt})
+        
+        summary = ""
+        try:
+            async for event in self.agent.client.chat_completion(messages, tools=None, stream=True):
+                if event.type == "text_delta" and event.text_delta:
+                    summary += event.text_delta.content
+        except Exception as e:
+            await chat.mount(Static(f"❌ Compaction failed: {e}", classes="tool-msg"))
+            inp = self.query_one(Input)
+            inp.disabled = False
+            inp.focus()
+            return
+            
+        if not summary:
+            await chat.mount(Static("❌ Compaction failed. No summary generated.", classes="tool-msg"))
+            inp = self.query_one(Input)
+            inp.disabled = False
+            inp.focus()
+            return
+            
+        # 2. Wipe memory and replace with summary
+        cm._messages.clear()
+        cm.api_prompt_tokens = 0
+        cm.api_completion_tokens = 0
+        cm.api_cached_tokens = 0
+        
+        # Insert summary as a pseudo-system/assistant message
+        cm.add_assistant_message(f"**[COMPACTED SESSION SUMMARY]**\n\n{summary}")
+        
+        await chat.mount(Markdown(f"✅ **Context Compacted Successfully!**\n\n{summary}", classes="system-msg"))
+        self._update_token_display()
+        chat.scroll_end(animate=False)
+        
+        inp = self.query_one(Input)
+        inp.disabled = False
+        inp.focus()
 
     async def _handle_commit(self) -> None:
         """Stage all changes, generate an AI commit message, show preview modal, commit."""
